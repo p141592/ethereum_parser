@@ -32,3 +32,8 @@ class RMQ:
             routing_key=routing_key,
             body=str(data)
         )
+
+
+def send_data(data, routing_key):
+    with RMQ() as rmq:
+        rmq.send_data(data, routing_key)
