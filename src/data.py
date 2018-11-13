@@ -1,3 +1,5 @@
+from asyncio import CancelledError
+
 import aiohttp
 import ujson
 
@@ -42,6 +44,9 @@ async def fetch(session, method, params):
                 timeout=aiohttp.ClientTimeout(total=15)
         ) as response:
             return await response.text()
+
+    except CancelledError:
+        pass
 
     except Exception as e:
         send_data(dict(
