@@ -89,7 +89,7 @@ async def main():
     print('GENERATING QUEUE ...')
     r_queue = asyncio.LifoQueue()
     for number in range(
-            int(e('RANGE_FROM')),
+            int(e('RANGE_FROM', 0)),
             int(e('RANGE_TO', get_blocks_count()))
     ):
         await put_task(r_queue, dict(
@@ -102,7 +102,7 @@ async def main():
 
     print('GENERATING WORKERS ...')
     workers = []
-    for _ in range(e('WORKERS', 70)):
+    for _ in range(int(e('WORKERS', 30))):
         workers.append(asyncio.create_task(worker(r_queue)))
     print('DONE')
     print(f'= Workers length: {len(workers)}')
