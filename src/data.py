@@ -7,9 +7,16 @@ import requests
 
 from rmq import send_data
 
-DATA_MAP = dict(
-    difficulty=lambda x: int(x, 16),
+NEED_CONVERT = (
+    'difficulty', 'gasLimit', 'gasUsed', 'number', 'size', 'timestamp', 'totalDifficulty', 'blockNumber',
+    'gas', 'gasPrice', 'value',
 )
+
+
+def convert_data(key, value):
+    if key in NEED_CONVERT:
+        return int(value, 16)
+    return value
 
 
 def prepare_data(func):
@@ -18,11 +25,7 @@ def prepare_data(func):
         if data:
             result = dict()
             for k, v in ujson.loads(data).get('result').items():
-                if DATA_MAP.get(k):
-                    result[k] = DATA_MAP[k](v)
-                    continue
-
-                result[k] = v
+                result[k] = convert_data(k, v)
             return result
 
     return wrap
