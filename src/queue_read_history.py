@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 import time
 
-from data import get_blocks_count, prepare_data
+from data import prepare_data
 from rmq import send_data
 
 start = time.time()
@@ -34,7 +34,7 @@ async def worker(queue):
     while warning_length > _warnings:
         try:
             if request_data:
-                print(f'{queue.qsize()} RE-CREATED TASK')
+                print(f'{int(time.time())}: RE-CREATED TASK {queue.qsize()}')
             request_data = await queue.get() if not request_data else request_data
 
             data = await fetch({
@@ -55,16 +55,16 @@ async def worker(queue):
                         params=[transaction_hash]
                     ))
 
-                print(f'{queue.qsize()} TASK DONE')
+                print(f'{int(time.time())}:  TASK DONE {queue.qsize()}')
                 request_data = None
                 queue.task_done()
 
         except asyncio.CancelledError:
-            print(f'{queue.qsize()} TASK Cancelled')
+            print(f'{int(time.time())}: TASK Cancelled {queue.qsize()} ')
             continue
 
         except asyncio.TimeoutError:
-            print(f'{queue.qsize()} TASK Timeout')
+            print(f'{int(time.time())}: TASK Timeout {queue.qsize()} ')
             continue
 
         _warnings += 1
@@ -74,17 +74,25 @@ async def worker(queue):
         print('Слишком большое количество ошибок\n  Поток закрыт')
 
 
-async def main(_from=6008149, _to=get_blocks_count()):
+async def main(_from=0, _to=2):
+    print('GENERATING QUEUE ...')
     r_queue = asyncio.LifoQueue()
     for number in range(_from, _to):
         await put_task(r_queue, dict(
             method='eth_getBlockByNumber',
             params=[hex(number), False]
         ))
+    print('DONE')
+    print(f'= Queue size: {r_queue.qsize()}')
+    time.sleep(2)
+    print('GENERATING WORKERS ...')
+    workers = []
+    for _ in range(70):
+        workers.append(asyncio.create_task(worker(r_queue)))
+    print('DONE')
+    print(f'= Workers length: {len(workers)}')
 
-    for _ in range(100):
-        asyncio.create_task(worker(r_queue))
-
-
+print('START')
+print(f'= time: {start}')
 asyncio.run(main())
 print(f'DURATION: {start-time.time()}')

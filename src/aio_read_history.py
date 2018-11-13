@@ -8,7 +8,7 @@ from rmq import send_data
 start = time.time()
 
 
-async def main(_from=6008149, _to=get_blocks_count()):
+async def main(_from=0, _to=get_blocks_count()):
     async with aiohttp.ClientSession() as session:
         for number in range(_from, _to):
             block = await fetch(session, 'eth_getBlockByNumber', [hex(number), False])
