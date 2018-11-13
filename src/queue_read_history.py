@@ -1,9 +1,13 @@
+import os
+
 import aiohttp
 import asyncio
 import time
 
-from data import prepare_data
+from data import prepare_data, get_blocks_count
 from rmq import send_data
+
+e = os.environ.get
 
 start = time.time()
 
@@ -17,10 +21,10 @@ async def fetch(data):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                    'https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967',
+                    e.get('NODE_URL'),
                     json=data,
                     headers={'Content-Type': 'application/json'},
-                    timeout=aiohttp.ClientTimeout(total=5)
+                    timeout=aiohttp.ClientTimeout(total=int(e('HTTP_TIMEOUT', 5)))
             ) as response:
                 return await response.text()
     except :
@@ -31,10 +35,11 @@ async def worker(queue):
     request_data = None
     warning_length = 50
     _warnings = 0
-    while warning_length > _warnings:
+    while (warning_length > _warnings or queue.qsize() != 0) and not request_data:
         try:
             if request_data:
                 print(f'{int(time.time())}: RE-CREATED TASK {queue.qsize()}')
+
             request_data = await queue.get() if not request_data else request_data
 
             data = await fetch({
@@ -50,7 +55,7 @@ async def worker(queue):
 
                 for transaction_hash in data.get('transactions', []):
                     # print(transaction_hash)
-                    queue.put_nowait(dict(
+                    await put_task(queue, dict(
                         method='eth_getTransactionByHash',
                         params=[transaction_hash]
                     ))
@@ -58,6 +63,9 @@ async def worker(queue):
                 print(f'{int(time.time())}:  TASK DONE {queue.qsize()}')
                 request_data = None
                 queue.task_done()
+                if queue.qsize() == 0:
+                    break
+            #print(request_data)
 
         except asyncio.CancelledError:
             print(f'{int(time.time())}: TASK Cancelled {queue.qsize()} ')
@@ -68,31 +76,44 @@ async def worker(queue):
             continue
 
         _warnings += 1
+        #await asyncio.sleep(1)
 
     else:
-        print('='*25)
-        print('Слишком большое количество ошибок\n  Поток закрыт')
+        if warning_length == _warnings:
+            print('='*25)
+            print('Слишком большое количество ошибок')
+        print('Worker закрыт')
 
 
-async def main(_from=0, _to=2):
+async def main():
     print('GENERATING QUEUE ...')
     r_queue = asyncio.LifoQueue()
-    for number in range(_from, _to):
+    for number in range(
+            int(e('RANGE_FROM')),
+            int(e('RANGE_TO', get_blocks_count()))
+    ):
         await put_task(r_queue, dict(
             method='eth_getBlockByNumber',
             params=[hex(number), False]
         ))
+
     print('DONE')
     print(f'= Queue size: {r_queue.qsize()}')
-    time.sleep(2)
+
     print('GENERATING WORKERS ...')
     workers = []
-    for _ in range(70):
+    for _ in range(e('WORKERS', 70)):
         workers.append(asyncio.create_task(worker(r_queue)))
     print('DONE')
     print(f'= Workers length: {len(workers)}')
 
-print('START')
-print(f'= time: {start}')
-asyncio.run(main())
-print(f'DURATION: {start-time.time()}')
+
+def run():
+    print('START')
+    print(f'= time: {start}')
+    asyncio.run(main())
+    print(f'DURATION: {start-time.time()}')
+
+
+if __name__ == '__main__':
+    run()

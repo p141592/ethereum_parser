@@ -2,10 +2,32 @@ import asyncio
 import time
 import aiohttp
 
-from data import fetch, get_blocks_count
+from data import get_blocks_count, prepare_data
 from rmq import send_data
 
 start = time.time()
+
+
+@prepare_data
+async def fetch(session, method, params):
+    data = {"jsonrpc": "2.0", "method": method, "params": params, "id": 1}
+    try:
+        async with session.post(
+                'https://mainnet.infura.io/',
+                json=data,
+                headers={'Content-Type': 'application/json'},
+                timeout=aiohttp.ClientTimeout(total=15)
+        ) as response:
+            return await response.text()
+
+    except asyncio.CancelledError:
+        pass
+
+    except Exception as e:
+        send_data(dict(
+            request=data,
+            exception=e
+        ), 'errors')
 
 
 async def main(_from=0, _to=get_blocks_count()):

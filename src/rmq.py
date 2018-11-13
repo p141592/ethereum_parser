@@ -1,14 +1,18 @@
+import os
+
 import pika
+
+e = os.environ.get
 
 
 class RMQ:
     def __init__(self):
-        self.user = 'rabbitmq'
-        self.password = 'rabbitmq'
-        self.host = 'localhost'
-        self.port = 5672
-        self.vhost = '/'
-        self.exchange = 'ethereum'
+        self.user = e('RMQ_USER', 'rabbitmq')
+        self.password = e('RMQ_PASSWORD', 'rabbitmq')
+        self.host = e('RMQ_HOST', 'localhost')
+        self.port = int(e('RMQ_PORT', 5672))
+        self.vhost = e('RMQ_VHOST', '/')
+        self.exchange = e('RMQ_EXCHANGE', 'ethereum')
 
     def __enter__(self):
         credentials = pika.PlainCredentials(self.user, self.password)
