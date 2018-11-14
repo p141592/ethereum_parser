@@ -13,6 +13,11 @@ ENV RMQ_HOST=localhost
 ENV RMQ_PORT=5672
 ENV RMQ_VHOST=/
 ENV RMQ_EXCHANGE=ethereum
+ENV RMQ_BLOCKS_QUEUE=blocks
+ENV RMQ_TRANSACTIONS_QUEUE=transactions
+
+# Пауза перед запуском, чтобы успел запуститься RMQ
+ENV SLEEP=10
 
 COPY requirements.pip /tmp/requirements.pip
 RUN pip3 install -r /tmp/requirements.pip

@@ -28,7 +28,7 @@ class RMQ:
             return self
         except ConnectionClosed:
             print('='*50)
-            print('! RMQ problems')
+            print('!!! RMQ problems !!!')
             print(self.__dict__)
             print('=' * 50)
             sys.exit(0)

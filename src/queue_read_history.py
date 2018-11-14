@@ -45,11 +45,6 @@ async def worker(name, queue):
     warning_length = 50
     _warnings = 0
     global BLOCKS
-    ## Если есть request_data -- Продолжить со старыми данными
-    ## Если warning_length > _warning -- Закрыть worker
-    ## Если в queue есть задача -- Получить задачу
-    ## Если нет -- Получить новый номер блока
-    ## Если номеров не осталось -- закруть worker
 
     while warning_length > _warnings:
         try:
@@ -68,7 +63,7 @@ async def worker(name, queue):
                         block_task=True
                     )
 
-            print(f'REQUEST_DATA: {request_data}')
+            #print(f'REQUEST_DATA: {request_data}')
 
             data = await fetch({
                 "jsonrpc": "2.0",
@@ -76,10 +71,13 @@ async def worker(name, queue):
                 "params": request_data.get('params'),
                 "id": 1
             })
-            print(f'DATA: {data}')
+            #print(f'DATA: {data}')
             if data:
                 _warnings = 0
-                send_data(data, request_data.get('method'))
+                if request_data.get('block_task'):
+                    send_data(data, e('RMQ_BLOCKS_QUEUE', 'blocks'))
+                else:
+                    send_data(data, e('RMQ_TRANSACTIONS_QUEUE', 'transactions'))
 
                 for transaction_hash in data.get('transactions', []):
                     # print(transaction_hash)
@@ -112,7 +110,7 @@ async def worker(name, queue):
     else:
         if warning_length == _warnings:
             print('='*25)
-            print('Слишком большое количество ошибок')
+            #print('Слишком большое количество ошибок')
 
     print('Worker закрыт')
 
@@ -135,6 +133,7 @@ async def main():
 def run():
     print('START')
     print(f'= time: {start}')
+    time.sleep(int(e('SLEEP', 0)))
     asyncio.run(main())
     print(f'DURATION: {start-time.time()}')
 
