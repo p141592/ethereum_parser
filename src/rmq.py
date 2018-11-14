@@ -1,6 +1,8 @@
 import os
+import sys
 
 import pika
+from pika.exceptions import ConnectionClosed
 
 e = os.environ.get
 
@@ -15,14 +17,21 @@ class RMQ:
         self.exchange = e('RMQ_EXCHANGE', 'ethereum')
 
     def __enter__(self):
-        credentials = pika.PlainCredentials(self.user, self.password)
-        parameters = pika.ConnectionParameters(self.host,
-                                               self.port,
-                                               self.vhost,
-                                               credentials)
+        try:
+            credentials = pika.PlainCredentials(self.user, self.password)
+            parameters = pika.ConnectionParameters(self.host,
+                                                   self.port,
+                                                   self.vhost,
+                                                   credentials)
 
-        self.conn = pika.BlockingConnection(parameters=parameters)
-        return self
+            self.conn = pika.BlockingConnection(parameters=parameters)
+            return self
+        except ConnectionClosed:
+            print('='*50)
+            print('! RMQ problems')
+            print(self.__dict__)
+            print('=' * 50)
+            sys.exit(0)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.conn.close()

@@ -5,19 +5,19 @@ services:
     build:
       .
     environment:
-      NODE_URL=https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967
-      #WORKERS=70
-      #HTTP_TIMEOUT=5
+      NODE_URL: https://mainnet.infura.io/v3/c5008aaf68e8f4de9a59f16f58a51b967
+      WORKERS: 70
+      HTTP_TIMEOUT: 5
 
-      #RANGE_FROM=0
-      #RANGE_TO=10
+      RANGE_FROM: 0
+      RANGE_TO: 10
 
-      #RMQ_USER=rabbitmq
-      #RMQ_PASSWORD=rabbitmq
-      #RMQ_HOST=localhost
-      #RMQ_PORT=5672
-      #RMQ_VHOST=/
-      #RMQ_EXCHANGE=ethereum
+      RMQ_USER: rabbitmq
+      RMQ_PASSWORD: rabbitmq
+      RMQ_HOST: rabbit
+      RMQ_PORT: 5672
+      RMQ_VHOST: /
+      RMQ_EXCHANGE: ethereum
 
     depends_on:
       - rabbit
