@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-docker build -t eth_explorer . && docker run -it eth_explorer
+docker build -t eth_parser . && docker run -it --name eth_parser -d eth_parser
