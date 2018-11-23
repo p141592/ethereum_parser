@@ -6,3 +6,4 @@ certifi
 cchardet
 aiodns
 aio_pika
+python-rapidjson

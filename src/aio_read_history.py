@@ -1,9 +1,8 @@
 import asyncio
-import json
 import os
 import time
 import ujson
-
+import rapidjson as json
 import aio_pika
 import aiohttp
 
@@ -49,7 +48,7 @@ async def main(loop, _from=0, _to=get_blocks_count()):
                 if block:
                     await channel.default_exchange.publish(
                         aio_pika.Message(
-                            body=ujson.dumps(block).encode()
+                            body=json.dumps(block).encode()
                         ),
                         routing_key=e('RMQ_BLOCKS_QUEUE', 'blocks')
                     )
@@ -59,7 +58,7 @@ async def main(loop, _from=0, _to=get_blocks_count()):
                         if data:
                             await channel.default_exchange.publish(
                                 aio_pika.Message(
-                                    body=ujson.dumps(data).encode()
+                                    body=json.dumps(data).encode()
                                 ),
                                 routing_key=e('RMQ_TRANSACTIONS_QUEUE', 'transactions')
                             )
