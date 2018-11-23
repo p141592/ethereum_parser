@@ -5,3 +5,4 @@ pika
 certifi
 cchardet
 aiodns
+aio_pika

@@ -1,10 +1,14 @@
 import os
+import sys
+
 import aiohttp
 import asyncio
 import time
 
+import pika as pika
+from pika.exceptions import ConnectionClosed
+
 from data import prepare_data, get_blocks_count
-from rmq import send_data
 
 e = os.environ.get
 
@@ -26,16 +30,15 @@ def block_number_generator():
 
 
 @prepare_data
-async def fetch(data):
+async def fetch(session, data):
     #try:
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-                e('NODE_URL', 'https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967'),
-                json=data,
-                headers={'Content-Type': 'application/json'},
-                timeout=aiohttp.ClientTimeout(total=int(e('HTTP_TIMEOUT', 5)))
-        ) as response:
-            return await response.text()
+    async with session.post(
+            e('NODE_URL', 'https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967'),
+            json=data,
+            headers={'Content-Type': 'application/json'},
+            timeout=aiohttp.ClientTimeout(total=int(e('HTTP_TIMEOUT', 5)))
+    ) as response:
+        return await response.text()
     #except:
     #    return
 
@@ -46,72 +49,92 @@ async def worker(name, queue):
     _warnings = 0
     global BLOCKS
 
-    while warning_length > _warnings:
-        try:
-            # Получение задачи
-            if request_data:
-                print(f'{int(time.time())}: RE-CREATED TASK {queue.qsize()}')
+    try:
+        credentials = pika.PlainCredentials(e('RMQ_USER', 'rabbitmq'), e('RMQ_PASSWORD', 'rabbitmq'))
+        parameters = pika.ConnectionParameters(e('RMQ_HOST', 'localhost'),
+                                               int(e('RMQ_PORT', 5672)),
+                                               e('RMQ_VHOST', '/'),
+                                               credentials)
 
-            else:
-                if queue.qsize() > 0:
-                    request_data = await queue.get()
+        rmq_conn = pika.BlockingConnection(parameters=parameters)
 
-                else:
-                    request_data = dict(
-                        method='eth_getBlockByNumber',
-                        params=[hex(next(BLOCKS)), False],
-                        block_task=True
-                    )
-
-            #print(f'REQUEST_DATA: {request_data}')
-
-            data = await fetch({
-                "jsonrpc": "2.0",
-                "method": request_data.get('method'),
-                "params": request_data.get('params'),
-                "id": 1
-            })
-            #print(f'DATA: {data}')
-            if data:
-                _warnings = 0
-                if request_data.get('block_task'):
-                    send_data(data, e('RMQ_BLOCKS_QUEUE', 'blocks'))
-                else:
-                    send_data(data, e('RMQ_TRANSACTIONS_QUEUE', 'transactions'))
-
-                for transaction_hash in data.get('transactions', []):
-                    # print(transaction_hash)
-                    await put_task(queue, dict(
-                        method='eth_getTransactionByHash',
-                        params=[transaction_hash],
-                        block_task=False
-                    ))
-
-                print(f'{int(time.time())}: TASK DONE {queue.qsize()}')
-
-                if not request_data.get('block_task'):
-                    queue.task_done()
-
-                request_data = None
-
-        except asyncio.CancelledError:
-            print(f'{int(time.time())}: TASK Cancelled {queue.qsize()} ')
-            continue
-
-        except asyncio.TimeoutError:
-            print(f'{int(time.time())}: TASK Timeout {queue.qsize()} ')
-            continue
-
-        except StopIteration:
-            break
-
-        _warnings += 1
+    except ConnectionClosed:
+        print('=' * 50)
+        print('!!! RMQ problems !!!')
+        print('=' * 50)
+        sys.exit(0)
 
     else:
-        if warning_length == _warnings:
-            print('='*25)
-            #print('Слишком большое количество ошибок')
+        async with aiohttp.ClientSession() as session:
+            while warning_length > _warnings:
+                try:
+                    # Получение задачи
+                    if request_data:
+                        print(f'{int(time.time())}: RE-CREATED TASK {queue.qsize()}')
 
+                    else:
+                        if queue.qsize() > 0:
+                            request_data = await queue.get()
+
+                        else:
+                            request_data = dict(
+                                method='eth_getBlockByNumber',
+                                params=[hex(next(BLOCKS)), False],
+                                block_task=True
+                            )
+
+                    #print(f'REQUEST_DATA: {request_data}')
+
+                    data = await fetch(session, {
+                        "jsonrpc": "2.0",
+                        "method": request_data.get('method'),
+                        "params": request_data.get('params'),
+                        "id": 1
+                    })
+                    #print(f'DATA: {data}')
+                    if data:
+                        _warnings = 0
+                        channel = rmq_conn.channel()
+                        channel.basic_publish(
+                            exchange=e('RMQ_EXCHANGE', 'ethereum'),
+                            routing_key=e('RMQ_BLOCKS_QUEUE', 'blocks') if request_data.get('block_task') else e('RMQ_TRANSACTIONS_QUEUE', 'transactions'),
+                            body=str(data)
+                        )
+
+                        for transaction_hash in data.get('transactions', []):
+                            # print(transaction_hash)
+                            await put_task(queue, dict(
+                                method='eth_getTransactionByHash',
+                                params=[transaction_hash],
+                                block_task=False
+                            ))
+
+                        print(f'{int(time.time())}: TASK DONE {queue.qsize()}')
+
+                        if not request_data.get('block_task'):
+                            queue.task_done()
+
+                        request_data = None
+
+                except asyncio.CancelledError:
+                    print(f'{int(time.time())}: TASK Cancelled {queue.qsize()} ')
+                    continue
+
+                except asyncio.TimeoutError:
+                    print(f'{int(time.time())}: TASK Timeout {queue.qsize()} ')
+                    continue
+
+                except StopIteration:
+                    break
+
+                _warnings += 1
+
+            else:
+                if warning_length == _warnings:
+                    print('='*25)
+                    #print('Слишком большое количество ошибок')
+
+    rmq_conn.close()
     print('Worker закрыт')
 
 
