@@ -7,11 +7,12 @@ RUN pip3 install -r /tmp/requirements.pip
 COPY src /opt/application
 
 ENV NODE_URL=https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967
-ENV WORKERS=195
+ENV WORKERS=1
 #ENV HTTP_TIMEOUT=5
 
 #ENV RANGE_FROM=0
 #ENV RANGE_TO=10
+#ENV BLOCKS='[1, 2, 3]'
 
 ENV RMQ_USER=rabbitmq
 ENV RMQ_PASSWORD=rabbitmq

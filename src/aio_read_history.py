@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import time
 import ujson
@@ -13,8 +14,12 @@ e = os.environ.get
 
 
 def block_number_generator(_from, _to):
-    for number in range(int(_from), int(_to)):
+    for number in range(int(_from), int(_to)) if not e('BLOCKS') else json.loads(e('BLOCKS')):
         yield number
+        print(number)
+
+
+generator = block_number_generator(int(e('RANGE_FROM', 0)), int(e('RANGE_TO', get_blocks_count())))
 
 
 @prepare_data
@@ -30,7 +35,6 @@ async def fetch(session, method, params):
 
 
 async def main(loop, _from=0, _to=get_blocks_count()):
-    generator = block_number_generator(_from, _to)
     connection = await aio_pika.connect_robust(
         f"amqp://{e('RMQ_USER', 'rabbitmq')}:{e('RMQ_PASSWORD', 'rabbitmq')}@{e('RMQ_HOST', 'localhost')}/",
         loop=loop
@@ -66,17 +70,13 @@ async def main(loop, _from=0, _to=get_blocks_count()):
 
 
 def run():
-    _from = 0
-    number = get_blocks_count()
     workers_len = int(e('WORKERS', 80))
-    pre_length = number/workers_len
 
     ioloop = asyncio.get_event_loop()
 
     workers = []
     for name in range(workers_len):
-        workers.append(ioloop.create_task(main(ioloop, _from=_from, _to=_from+int(pre_length))))
-        _from = _from + int(pre_length)
+        workers.append(ioloop.create_task(main(ioloop)))
 
     wait_tasks = asyncio.wait(workers)
 
