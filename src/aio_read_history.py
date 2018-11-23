@@ -66,6 +66,8 @@ async def main(loop, _from=0, _to=get_blocks_count()):
             except StopIteration:
                 break
 
+            print(f'{number}: DONE')
+
         await connection.close()
 
 
