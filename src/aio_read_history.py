@@ -16,7 +16,6 @@ e = os.environ.get
 def block_number_generator(_from, _to):
     for number in range(int(_from), int(_to)) if not e('BLOCKS') else json.loads(e('BLOCKS')):
         yield number
-        print(number)
 
 
 generator = block_number_generator(int(e('RANGE_FROM', 0)), int(e('RANGE_TO', get_blocks_count())))
@@ -46,10 +45,11 @@ async def main(loop, _from=0, _to=get_blocks_count()):
             try:
                 number = next(generator)
                 block = await fetch(session, 'eth_getBlockByNumber', [hex(number), False])
+
                 if block:
                     await channel.default_exchange.publish(
                         aio_pika.Message(
-                            body=str(block).encode()
+                            body=ujson.dumps(block).encode()
                         ),
                         routing_key=e('RMQ_BLOCKS_QUEUE', 'blocks')
                     )
@@ -59,7 +59,7 @@ async def main(loop, _from=0, _to=get_blocks_count()):
                         if data:
                             await channel.default_exchange.publish(
                                 aio_pika.Message(
-                                    body=str(data).encode()
+                                    body=ujson.dumps(data).encode()
                                 ),
                                 routing_key=e('RMQ_TRANSACTIONS_QUEUE', 'transactions')
                             )
