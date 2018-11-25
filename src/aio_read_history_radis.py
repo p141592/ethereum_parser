@@ -34,7 +34,7 @@ async def fetch(session, method, params):
 
 async def main(loop, _from=0, _to=get_blocks_count()):
 
-    connection = await aioredis.create_redis(f"redis://{e('REDIS_HOST', 'localhost')}", loop=loop)
+    connection = await aioredis.create_redis(f"redis://{e('REDIS_HOST', 'localhost')}/{e('REDIS_DB', 1)}", loop=loop)
     async with aiohttp.ClientSession(json_serialize=ujson.dumps) as session:
         while 1:
             try:
