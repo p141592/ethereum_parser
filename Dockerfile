@@ -8,7 +8,7 @@ COPY src /opt/application
 WORKDIR /opt/application
 
 ENV NODE_URL=https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967
-#ENV WORKERS=1200
+ENV WORKERS=190
 #ENV HTTP_TIMEOUT=5
 
 #ENV RANGE_FROM=47357
@@ -23,8 +23,9 @@ ENV RMQ_VHOST=/
 ENV RMQ_EXCHANGE=ethereum
 ENV RMQ_BLOCKS_QUEUE=blocks
 ENV RMQ_TRANSACTIONS_QUEUE=transactions
-#ENV REDIS_HOST=local
+ENV APP_COMMAND python main.py
+#ENV REDIS_HOST=localhost
 
 #ENV TIME_SLEEP=1
 
-CMD python main.py
+CMD $APP_COMMAND
