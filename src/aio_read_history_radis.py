@@ -43,7 +43,7 @@ async def main(loop, _from=0, _to=get_blocks_count()):
 
                 if block:
                     await connection.execute(
-                        'set',
+                        'append',
                         e('RMQ_BLOCKS_QUEUE', 'blocks'),
                         json.dumps(block).encode()
                     )
@@ -52,7 +52,7 @@ async def main(loop, _from=0, _to=get_blocks_count()):
                         data = await fetch(session, 'eth_getTransactionByHash', [transaction_hash])
                         if data:
                             await connection.execute(
-                                'set',
+                                'append',
                                 e('RMQ_TRANSACTIONS_QUEUE', 'transactions'),
                                 json.dumps(data).encode()
                             )
