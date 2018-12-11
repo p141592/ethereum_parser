@@ -26,7 +26,7 @@ def block_number_generator(_from, _to):
 generator = block_number_generator(int(e('RANGE_FROM', 0)), int(e('RANGE_TO', get_blocks_count())))
 
 
-def main(number):
+def main():
     global _LEN
     try:
         credentials = pika.PlainCredentials(e('RMQ_USER', 'rabbitmq'), e('RMQ_PASSWORD', 'rabbitmq'))
@@ -46,6 +46,7 @@ def main(number):
         channel = rmq_conn.channel()
         while True:
             try:
+                number = next(generator)
                 block = w3.eth.getBlock(number, full_transactions=True)
 
                 for tx in block.transactions:
@@ -113,7 +114,7 @@ def main(number):
 #     ioloop.close()
 
 def run():
-    jobs = [gevent.spawn(main, number) for number in generator]
+    jobs = [gevent.spawn(main) for i in range(int(e('WORKERS', 80)))]
     gevent.wait(jobs)
 
 
