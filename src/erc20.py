@@ -1,6 +1,7 @@
 import json
 
-from web3.auto import w3
+from web3.auto.infura import w3
+from web3.exceptions import BadFunctionCallOutput
 
 from tools import toDict
 
@@ -31,40 +32,56 @@ ERC20_ABI = json.loads('[{"constant":true,"inputs":[],"name":"name","outputs":[{
                        '"type":"address"},{"indexed":false,"name":"_value","type":"uint256"}],"name":"Approval",'
                        '"type":"event"}]')
 
-
-async def parse_transaction(transaction):
-    # Получили транзакцию
-    # transaction = w3.eth.getTransaction('0x7e84c4538e056f03ab689d1b0b112b47921b2f82fea0396bfa38194b6461ffdd')
-    if not w3.toText(w3.toText(transaction.input)):
-        # Проверить input_data
-        return json.dumps(transaction, cls=toDict)
-        # -> Вернуть результат
-
-    # Если есть:
-    # По адресу получателя получить контракт
-    erc20 = await get_erc20_contract(transaction.to)
-    # Проверить на erc20
-    # Спарсить input_data
-
-    return await parse_input_data(erc20, transaction.to)
+Contract = w3.eth.contract(abi=ERC20_ABI)
 
 
-async def parse_input_data(contract, transaction):
+def enrichment_dec(func):
+    def wrap(tx):
+        _tx = dict(tx)
+        _result = func(tx)
+        if _result:
+            _tx['input'], _tx['erc20'] = _result
+        return _tx
+    return wrap
+
+
+@enrichment_dec
+def enrichment_transaction(transaction):
+    try:
+        contract = get_erc20_contract(transaction.to)
+        input_data = parse_input_data(contract, transaction)
+    except ValueError:
+        return None
+    else:
+
+        return input_data, parse_erc20(contract)
+
+
+def parse_input_data(contract, transaction):
+    _data = contract.decode_function_input(transaction.input)
     return dict(
-        function=contract.decode_function_input(transaction.input)[0].fn_name(),
-        data=contract.decode_function_input(transaction.input)[1]
+        function=_data[0].fn_name,
+        data=_data[1]
     )
 
 
-async def get_erc20_contract(address):
-    return await w3.eth.contract(address=address, abi=ERC20_ABI)
+def get_erc20_contract(address):
+    return Contract(address=address)
 
 
-async def parse_erc20(address):
-    erc20 = await get_erc20_contract(address)
+def parse_erc20(erc20):
+    try:
+        name = erc20.functions.name().call()
+        symbol = erc20.functions.symbol().call()
+        decimals = erc20.functions.decimals().call()
+        totalSupply = erc20.functions.totalSupply().call()
+
+    except BadFunctionCallOutput:
+        return None
+
     return dict(
-        name=await erc20.functions.name().call(),
-        symbol=await erc20.functions.symbol().call(),
-        decimals=await erc20.functions.decimals().call(),
-        totalSupply=await erc20.functions.totalSupply().call()
+        name=name,
+        symbol=symbol,
+        decimals=decimals,
+        totalSupply=totalSupply
     )

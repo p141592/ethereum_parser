@@ -1,3 +1,4 @@
+
 def toDict(dictToParse):
     # convert any 'AttributeDict' type found to 'dict'
     parsedDict = dict(dictToParse)
