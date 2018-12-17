@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 import time
@@ -15,8 +14,6 @@ import gevent
 start = time.time()
 e = os.environ.get
 
-_LEN = 0
-
 
 def block_number_generator(_from, _to):
     for number in range(int(_from), int(_to)) if not e('BLOCKS') else json.loads(e('BLOCKS')):
@@ -27,7 +24,6 @@ generator = block_number_generator(int(e('RANGE_FROM', 0)), int(e('RANGE_TO', ge
 
 
 def main():
-    global _LEN
     try:
         credentials = pika.PlainCredentials(e('RMQ_USER', 'rabbitmq'), e('RMQ_PASSWORD', 'rabbitmq'))
         parameters = pika.ConnectionParameters(e('RMQ_HOST', 'localhost'),
@@ -55,7 +51,6 @@ def main():
                     if e('DEBUG', False):
                         print('='*150)
                         print(tx)
-                    _LEN += 1
                 print(f'{number}: DONE')
 
                 channel.basic_publish(
@@ -114,8 +109,7 @@ def main():
 #     ioloop.close()
 
 def run():
-    jobs = [gevent.spawn(main) for i in range(int(e('WORKERS', 80)))]
-    gevent.wait(jobs)
+    main()
 
 
 if __name__ == '__main__':
