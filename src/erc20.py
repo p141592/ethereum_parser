@@ -38,10 +38,10 @@ Contract = w3.eth.contract(abi=ERC20_ABI)
 def enrichment_dec(func):
     def wrap(tx):
         _tx = dict(tx)
-        _result = func(tx)
+        _result, _erc20 = func(tx)
         if _result:
-            _tx['input'], _tx['erc20'] = _result
-        return _tx
+            _tx['input'] = _result
+        return _tx, _erc20
     return wrap
 
 
@@ -51,10 +51,12 @@ def enrichment_transaction(transaction):
         contract = get_erc20_contract(transaction.to)
         input_data = parse_input_data(contract, transaction)
     except ValueError:
-        return None
-    else:
+        return None, None
+    except TypeError:
+        return None, None
 
-        return input_data, parse_erc20(contract)
+    else:
+        return input_data, parse_erc20(contract, transaction.to)
 
 
 def parse_input_data(contract, transaction):
@@ -69,7 +71,7 @@ def get_erc20_contract(address):
     return Contract(address=address)
 
 
-def parse_erc20(erc20):
+def parse_erc20(erc20, address):
     try:
         name = erc20.functions.name().call()
         symbol = erc20.functions.symbol().call()
@@ -78,9 +80,12 @@ def parse_erc20(erc20):
 
     except BadFunctionCallOutput:
         return None
+    except OverflowError:
+        return None
 
     return dict(
         name=name,
+        address=address,
         symbol=symbol,
         decimals=decimals,
         totalSupply=totalSupply

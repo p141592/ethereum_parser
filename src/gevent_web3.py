@@ -18,6 +18,8 @@ if e('IPC_PATH'):
 else:
     from web3.auto.infura import w3
 
+ERC20 = set()
+
 
 def block_number_generator(_from, _to):
     for number in range(int(_from), int(_to)) if not e('BLOCKS') else json.loads(e('BLOCKS')):
@@ -50,11 +52,21 @@ def main():
                 block = w3.eth.getBlock(number, full_transactions=True)
 
                 for tx in block.transactions:
-                    tx = enrichment_transaction(tx)
+                    tx, erc20 = enrichment_transaction(tx)
                     tx.update(w3.eth.getTransactionReceipt(tx['hash']))
                     if e('DEBUG', False):
                         print('='*150)
                         print(tx)
+
+                    if erc20 and erc20.get('address') not in ERC20:
+                        channel.basic_publish(
+                            exchange=e('RMQ_EXCHANGE', 'ethereum'),
+                            routing_key=e('RMQ_ERC20_QUEUE', 'erc20'),
+                            body=json.dumps(toDict(erc20)).encode()
+                        )
+                        ERC20.add(erc20.get('address'))
+
+                        print('== NEW ERC20')
                 print(f'{number}: DONE')
 
                 channel.basic_publish(
