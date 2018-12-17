@@ -3,16 +3,20 @@ import sys
 import time
 import rapidjson as json
 import pika
-from pika.exceptions import ConnectionClosed
-from web3.auto.infura import w3
 
+from pika.exceptions import ConnectionClosed
 from data import get_blocks_count
 from erc20 import enrichment_transaction
 from tools import toDict
-import gevent
 
 start = time.time()
 e = os.environ.get
+
+if e('IPC_PATH'):
+    from web3 import Web3
+    w3 = Web3(Web3.IPCProvider(e('IPC_PATH')))
+else:
+    from web3.auto.infura import w3
 
 
 def block_number_generator(_from, _to):
