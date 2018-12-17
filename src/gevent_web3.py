@@ -1,3 +1,4 @@
+import gevent
 import os
 import sys
 import time
@@ -66,7 +67,9 @@ def main():
                         )
                         ERC20.add(erc20.get('address'))
 
+                    if e('DEBUG', False):
                         print('== NEW ERC20')
+
                 print(f'{number}: DONE')
 
                 channel.basic_publish(
@@ -125,7 +128,7 @@ def main():
 #     ioloop.close()
 
 def run():
-    main()
+    gevent.joinall([gevent.spawn(main) for i in e('WORKERS', 10)])
 
 
 if __name__ == '__main__':

@@ -6,7 +6,7 @@ RUN pip3 install -r /tmp/requirements.pip
 ENV NODE_URL=https://mainnet.infura.io/v3/c5008af68e8f4de9a59f16f58a51b967
 ENV INFURA_API_KEY=c9514d7c8ec947f59b4f9e761b3d6fb3
 ENV WORKERS=50
-ENV DEBUG=1
+#ENV DEBUG=1
 #ENV HTTP_TIMEOUT=5
 
 ENV RANGE_FROM=4900000
