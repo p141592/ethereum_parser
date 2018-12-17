@@ -7,7 +7,7 @@ import pika
 
 from pika.exceptions import ConnectionClosed
 from data import get_blocks_count
-from erc20 import enrichment_transaction
+from erc20 import enrichment_transaction, ERC20
 from tools import toDict
 
 start = time.time()
@@ -19,8 +19,6 @@ if e('IPC_PATH'):
 else:
     from web3.auto.infura import w3
 
-ERC20 = set()
-
 
 def block_number_generator(_from, _to):
     for number in range(int(_from), int(_to)) if not e('BLOCKS') else json.loads(e('BLOCKS')):
@@ -30,58 +28,41 @@ def block_number_generator(_from, _to):
 generator = block_number_generator(int(e('RANGE_FROM', 0)), int(e('RANGE_TO', get_blocks_count())))
 
 
-def main():
-    try:
-        credentials = pika.PlainCredentials(e('RMQ_USER', 'rabbitmq'), e('RMQ_PASSWORD', 'rabbitmq'))
-        parameters = pika.ConnectionParameters(e('RMQ_HOST', 'localhost'),
-                                               int(e('RMQ_PORT', 5672)),
-                                               e('RMQ_VHOST', '/'),
-                                               credentials)
-        rmq_conn = pika.BlockingConnection(parameters=parameters)
+def main(channel):
+        try:
+            number = next(generator)
+            block = w3.eth.getBlock(number, full_transactions=True)
 
-    except ConnectionClosed:
-        print('=' * 50)
-        print('!!! RMQ problems !!!')
-        print('=' * 50)
-        sys.exit(0)
+            for tx in block.transactions:
+                tx, erc20 = enrichment_transaction(tx)
+                tx.update(w3.eth.getTransactionReceipt(tx['hash']))
+                if e('DEBUG', False):
+                    print('='*150)
+                    print(tx)
 
-    else:
-        channel = rmq_conn.channel()
-        while True:
-            try:
-                number = next(generator)
-                block = w3.eth.getBlock(number, full_transactions=True)
-
-                for tx in block.transactions:
-                    tx, erc20 = enrichment_transaction(tx)
-                    tx.update(w3.eth.getTransactionReceipt(tx['hash']))
-                    if e('DEBUG', False):
-                        print('='*150)
-                        print(tx)
-
-                    if erc20 and erc20.get('address') not in ERC20:
-                        channel.basic_publish(
-                            exchange=e('RMQ_EXCHANGE', 'ethereum'),
-                            routing_key=e('RMQ_ERC20_QUEUE', 'erc20'),
-                            body=json.dumps(toDict(erc20)).encode()
-                        )
-                        ERC20.add(erc20.get('address'))
+                if erc20 and erc20.get('address') not in ERC20:
+                    channel.basic_publish(
+                        exchange=e('RMQ_EXCHANGE', 'ethereum'),
+                        routing_key=e('RMQ_ERC20_QUEUE', 'erc20'),
+                        body=json.dumps(toDict(erc20)).encode()
+                    )
+                    ERC20.add(erc20.get('address'))
 
                     if e('DEBUG', False):
                         print('== NEW ERC20')
 
-                print(f'{number}: DONE')
+            print(f'{number}: DONE')
 
-                channel.basic_publish(
-                    exchange=e('RMQ_EXCHANGE', 'ethereum'),
-                    routing_key=e('RMQ_BLOCKS_QUEUE', 'blocks'),
-                    body=json.dumps(toDict(block)).encode()
-                )
+            channel.basic_publish(
+                exchange=e('RMQ_EXCHANGE', 'ethereum'),
+                routing_key=e('RMQ_BLOCKS_QUEUE', 'blocks'),
+                body=json.dumps(toDict(block)).encode()
+            )
 
-            except StopIteration:
-                break
+        except StopIteration:
+            return
 
-    rmq_conn.close()
+
 
 
 # async def speedtest():
@@ -127,8 +108,30 @@ def main():
 #     ioloop.run_until_complete(wait_tasks)
 #     ioloop.close()
 
+
 def run():
-    gevent.joinall([gevent.spawn(main) for i in e('WORKERS', 10)])
+    #main()
+    try:
+        credentials = pika.PlainCredentials(e('RMQ_USER', 'rabbitmq'), e('RMQ_PASSWORD', 'rabbitmq'))
+        parameters = pika.ConnectionParameters(e('RMQ_HOST', 'localhost'),
+                                               int(e('RMQ_PORT', 5672)),
+                                               e('RMQ_VHOST', '/'),
+                                               credentials)
+        rmq_conn = pika.BlockingConnection(parameters=parameters)
+        channel = rmq_conn.channel()
+
+    except ConnectionClosed:
+        print('=' * 50)
+        print('!!! RMQ problems !!!')
+        print('=' * 50)
+        sys.exit(0)
+
+    threads = []
+    for i in range(int(e('WORKERS', 10))):
+        threads.append(gevent.spawn(main, channel))
+    gevent.joinall(threads)
+
+    rmq_conn.close()
 
 
 if __name__ == '__main__':

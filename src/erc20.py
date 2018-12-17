@@ -3,6 +3,8 @@ import os
 
 from web3.exceptions import BadFunctionCallOutput
 
+ERC20 = set()
+
 e = os.environ.get
 
 if e('IPC_PATH'):
@@ -63,7 +65,7 @@ def enrichment_transaction(transaction):
         return None, None
 
     else:
-        return input_data, parse_erc20(contract, transaction.to)
+        return input_data, parse_erc20(contract, transaction.to) if transaction.to not in ERC20 else None
 
 
 def parse_input_data(contract, transaction):
@@ -89,7 +91,10 @@ def parse_erc20(erc20, address):
         return None
     except OverflowError:
         return None
+    except ValueError:
+        return None
 
+    ERC20.add(address)
     return dict(
         name=name,
         address=address,
