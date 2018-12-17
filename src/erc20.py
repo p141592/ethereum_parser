@@ -1,9 +1,16 @@
 import json
+import os
 
-from web3.auto.infura import w3
 from web3.exceptions import BadFunctionCallOutput
 
-from tools import toDict
+e = os.environ.get
+
+if e('IPC_PATH'):
+    from web3 import Web3
+    w3 = Web3(Web3.IPCProvider(e('IPC_PATH')))
+else:
+    from web3.auto.infura import w3
+
 
 ERC20_ABI = json.loads('[{"constant":true,"inputs":[],"name":"name","outputs":[{"name":"","type":"string"}],'
                        '"payable":false,"stateMutability":"view","type":"function"},{"constant":false,"inputs":[{'
